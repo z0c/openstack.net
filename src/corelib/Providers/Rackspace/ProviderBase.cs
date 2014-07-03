@@ -117,7 +117,7 @@ namespace net.openstack.Providers.Rackspace
             if (userAccess == null || userAccess.ServiceCatalog == null)
                 throw new UserAuthenticationException("Unable to authenticate user and retrieve authorized service endpoints");
 
-            var serviceDetails = userAccess.ServiceCatalog.FirstOrDefault(sc => sc.Name == serviceName);
+            var serviceDetails = userAccess.ServiceCatalog.FirstOrDefault(sc => string.Equals(sc.Name, serviceName, StringComparison.OrdinalIgnoreCase));
 
             if (serviceDetails == null || serviceDetails.Endpoints == null || serviceDetails.Endpoints.Length == 0)
                 throw new UserAuthorizationException("The user does not have access to the requested service.");
@@ -125,9 +125,9 @@ namespace net.openstack.Providers.Rackspace
             if (string.IsNullOrWhiteSpace(region))
                 region = userAccess.User.DefaultRegion;
 
-            var endpoint = serviceDetails.Endpoints.FirstOrDefault(e => e.Region.Equals(region, StringComparison.OrdinalIgnoreCase));
+            var endpoint = serviceDetails.Endpoints.FirstOrDefault(e => string.Equals(e.Region ?? string.Empty, region ?? string.Empty, StringComparison.OrdinalIgnoreCase));
 
-            if(endpoint == null)
+            if (endpoint == null)
                 throw new UserAuthorizationException("The user does not have access to the requested service or region.");
 
             return endpoint.PublicURL;

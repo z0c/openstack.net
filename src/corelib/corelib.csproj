@@ -48,6 +48,7 @@
     <Compile Include="Core\Domain\Address.cs" />
     <Compile Include="Core\Domain\CloudIdentity.cs" />
     <Compile Include="Core\Domain\Container.cs" />
+    <Compile Include="Core\Domain\ExtendedEndpoint.cs" />
     <Compile Include="Core\Domain\Flavor.cs" />
     <Compile Include="Core\Domain\FlavorDetails.cs" />
     <Compile Include="Core\Domain\ImageType.cs" />
@@ -96,6 +97,7 @@
     <Compile Include="Core\Domain\NewServer.cs" />
     <Compile Include="Providers\Rackspace\Objects\Response\ListAddressesByNetworkResponse.cs" />
     <Compile Include="Providers\Rackspace\Objects\Response\ListAddressesResponse.cs" />
+    <Compile Include="Providers\Rackspace\Objects\Response\ListEndpointsResponse.cs" />
     <Compile Include="Providers\Rackspace\Objects\Response\ListFlavorDetailsResponse.cs" />
     <Compile Include="Providers\Rackspace\Objects\Response\ListFlavorsResponse.cs" />
     <Compile Include="Providers\Rackspace\Objects\Response\ListImagesDetailsResponse.cs" />

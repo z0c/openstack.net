@@ -352,6 +352,10 @@ namespace net.openstack.Providers.Rackspace
 
         public UserAccess GetUserAccess(CloudIdentity identity, bool forceCacheRefresh = false)
         {
+            var impIdentity = identity as RackspaceImpersonationIdentity;
+            if (impIdentity != null)
+                return Impersonate(impIdentity, forceCacheRefresh);
+
             var cloudInstance = CloudInstance.Default;
             var rackspaceCloudIdentity = identity as RackspaceCloudIdentity;
 
@@ -372,30 +376,100 @@ namespace net.openstack.Providers.Rackspace
             return userAccess;
         }
 
-        public UserAccess Authenticate(RackspaceImpersonationIdentity identity, bool forceCacheRefresh = false)
+        public UserAccess Impersonate(RackspaceImpersonationIdentity identity, bool forceCacheRefresh = false)
         {
             var impToken = _userAccessCache.Get(string.Format("imp/{0}/{1}", identity.UserToImpersonate.CloudInstance, identity.UserToImpersonate.Username), () => {
                 const string urlPath = "/v2.0/RAX-AUTH/impersonation-tokens";
-                var request = BuildImpersonationRequestJson(urlPath, identity.UserToImpersonate.Username, 600);
-                var response = ExecuteRESTRequest<UserImpersonationResponse>(identity, urlPath, HttpMethod.POST, request);
-
+                var request = BuildImpersonationRequestJson(identity.UserToImpersonate.Username, 600);
+                var parentIdentity = new RackspaceCloudIdentity(identity);
+                var response = ExecuteRESTRequest<UserImpersonationResponse>(parentIdentity, urlPath, HttpMethod.POST, request);
                 if (response == null || response.Data == null || response.Data.UserAccess == null)
                     return null;
 
-                return response.Data.UserAccess;
+                IdentityToken impersonationToken = response.Data.UserAccess.Token;
+                if (impersonationToken == null)
+                    return null;
+
+                var userAccess = ValidateToken(impersonationToken.Id, identity: parentIdentity);
+                if (userAccess == null)
+                    return null;
+
+                var endpoints = ListEndpoints(impersonationToken.Id, parentIdentity);
+
+                var serviceCatalog = BuildServiceCatalog(endpoints);
+
+                return new UserAccess{Token = userAccess.Token, User = userAccess.User, ServiceCatalog = serviceCatalog};
             }, forceCacheRefresh);
 
             return impToken;
         }
 
-        private JObject BuildImpersonationRequestJson(string path, string userName, int expirationInSeconds)
+        public virtual IEnumerable<ExtendedEndpoint> ListEndpoints(string token, CloudIdentity identity = null)
+        {
+            if (token == null)
+                throw new ArgumentNullException("token");
+            if (string.IsNullOrEmpty(token))
+                throw new ArgumentException("token cannot be empty");
+
+            var response = ExecuteRESTRequest<ListEndpointsResponse>(identity, string.Format("/v2.0/tokens/{0}/endpoints", token), HttpMethod.GET);
+
+
+            if (response == null || response.Data == null)
+                return null;
+
+            return response.Data.Endpoints;
+        }
+
+        protected virtual ServiceCatalog[] BuildServiceCatalog(IEnumerable<ExtendedEndpoint> endpoints)
+        {
+            if (endpoints == null)
+                throw new ArgumentNullException("endpoints");
+            if (endpoints.Contains(null))
+                throw new ArgumentException("endpoints cannot contain any null values", "endpoints");
+
+            var serviceCatalog = new List<ServiceCatalog>();
+            var services = endpoints.Select(e => Tuple.Create(e.Type, e.Name)).Distinct();
+
+            foreach (var service in services)
+            {
+                string type = service.Item1;
+                string name = service.Item2;
+                IEnumerable<ExtendedEndpoint> serviceEndpoints = endpoints.Where(endpoint => string.Equals(type, endpoint.Type, StringComparison.OrdinalIgnoreCase) && string.Equals(name, endpoint.Name, StringComparison.OrdinalIgnoreCase));
+                serviceCatalog.Add(new ServiceCatalog{Name = name, Type = type, Endpoints = serviceEndpoints.ToArray()});
+            }
+
+            return serviceCatalog.ToArray();
+        }
+
+        public virtual UserAccess ValidateToken(string token, string tenantId = null, CloudIdentity identity = null)
+        {
+            if (token == null)
+                throw new ArgumentNullException("token");
+            if (string.IsNullOrEmpty(token))
+                throw new ArgumentException("token cannot be empty");
+
+            var queryStringParameters = BuildOptionalParameterList(new Dictionary<string, string>
+                {
+                    {"belongsTo", tenantId}
+                });
+
+            var response = ExecuteRESTRequest<AuthenticationResponse>(identity, string.Format("/v2.0/tokens/{0}", token), HttpMethod.GET, queryStringParameter: queryStringParameters);
+
+
+            if (response == null || response.Data == null || response.Data.UserAccess == null || response.Data.UserAccess.Token == null)
+                return null;
+
+            return response.Data.UserAccess;
+        }
+
+        private JObject BuildImpersonationRequestJson(string userName, int expirationInSeconds)
         {
             var request = new JObject();
             var impInfo = new JObject();
-            var user = new JObject { { "username", userName }, { "expire-in-seconds", expirationInSeconds } };
+            var user = new JObject { { "username", userName } };
             impInfo.Add("user", user);
-            var parts = path.Split('/');
-            request.Add(string.Format("{0}:impersonation", parts[1]), impInfo);
+            impInfo.Add("expire-in-seconds", expirationInSeconds);
+            request.Add("RAX-AUTH:impersonation", impInfo);
 
             return request;
         }
