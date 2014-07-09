@@ -1,4 +1,5 @@
-﻿using net.openstack.Core.Domain;
+﻿using System.Collections.Generic;
+using net.openstack.Core.Domain;
 
 namespace net.openstack.Core
 {
@@ -22,5 +23,6 @@ namespace net.openstack.Core
         Tenant[] ListTenants(CloudIdentity identity);
         UserAccess GetUserAccess(CloudIdentity identity, bool forceCacheRefresh = false);
         UserCredential GetUserCredential(CloudIdentity identity, string userId, string credentialKey);
+        IEnumerable<User> ListUsersByRoleId(CloudIdentity identity, string roleId, string serviceId = null, int? marker = null, int? limit = 10000);
     }
 }

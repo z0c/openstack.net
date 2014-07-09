@@ -233,6 +233,38 @@ namespace net.openstack.Providers.Rackspace
             return response.Data.Users;
         }
 
+        public IEnumerable<User> ListUsersByRoleId(CloudIdentity identity, string roleId, string serviceId = null, int? marker = null, int? limit = 10000)
+        {
+            if (limit < 0)
+                throw new ArgumentOutOfRangeException("limit");
+
+            var parameters = BuildOptionalParameterList(new Dictionary<string, string>
+                {
+                    {"serviceId", serviceId},
+                    {"marker", !marker.HasValue ? null : marker.Value.ToString()},
+                    {"limit", !limit.HasValue ? null : limit.Value.ToString()},
+                });
+
+            var response = ExecuteRESTRequest<UsersResponse>(identity, string.Format("/v2.0/OS-KSADM/roles/{0}/RAX-AUTH/users​", roleId), HttpMethod.GET, queryStringParameter: parameters);
+
+            if (response == null || response.Data == null)
+                return null;
+
+            // Due to the fact the sometimes the API returns a JSON array of users and sometimes it returns a single JSON user object.  
+            // Therefore if we get a null data object (which indicates that the deserializer could not parse to an array) we need to try and parse as a single User object.
+            if (response.Data.Users == null)
+            {
+                var userResponse = JsonConvert.DeserializeObject<UserResponse>(response.RawBody);
+
+                if (response == null || response.Data == null)
+                    return null;
+
+                return new[] { userResponse.User };
+            }
+
+            return response.Data.Users;
+        }
+
         public User GetUserByName(CloudIdentity identity, string name)
         {
             var urlPath = string.Format("/v2.0/users/?name={0}", name);

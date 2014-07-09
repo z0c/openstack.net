@@ -1,4 +1,5 @@
-﻿using JSIStudios.SimpleRESTServices.Client;
+﻿using System.Collections.Generic;
+using JSIStudios.SimpleRESTServices.Client;
 using net.openstack.Core.Domain;
 using net.openstack.Core.Exceptions;
 
@@ -149,6 +150,12 @@ namespace net.openstack.Providers.Rackspace
         {
             var provider = GetProvider(identity);
             return provider.GetUserCredential(identity, userId, credentialKey);
+        }
+
+        public IEnumerable<User> ListUsersByRoleId(CloudIdentity identity, string roleId, string serviceId = null, int? marker = null, int? limit = 10000)
+        {
+            var provider = GetProvider(identity);
+            return provider.ListUsersByRoleId(identity, roleId, serviceId, marker, limit);
         }
 
         public string GetToken(CloudIdentity identity, bool forceCacheRefresh = false)
